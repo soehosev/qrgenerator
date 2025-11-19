@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-gray-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>QR Code Generator + Logo Tengah</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/davidshimjs/qrcodejs/qrcode.min.js"></script>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+<div class="w-full max-w-lg" x-data="qrGenerator()">
+
+  <div class="bg-white rounded-2xl shadow-xl p-8">
+    <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">
+      QR Code dengan Logo ditengah
+    </h1>
+
+    <!-- Input URL -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-2">Link / URL</label>
+      <input 
+        type="text" 
+        x-model="url"
+        @input.debounce.500ms="generateQR"
+        placeholder="https://example.com"
+        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+      />
+    </div>
+
+    <!-- Upload Logo -->
+    <div class="mb-6">
+      <label class="block text-sm font-medium text-gray-700 mb-2">
+        Logo di Tengah (opsional)
+      </label>
+      <input type="file" accept="image/*" @change="onFileChange" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+      <p class="text-xs text-gray-500 mt-1">Kosongkan jika tidak ingin pakai logo</p>
+    </div>
+
+    <!-- Preview QR Code -->
+    <div class="flex justify-center mb-6">
+      <div x-show="url.trim() !== ''" x-transition>
+        <canvas id="qrCanvas" class="border-4 border-dashed border-gray-200 rounded-xl"></canvas>
+      </div>
+      <div x-show="url.trim() === ''" class="w-64 h-64 flex items-center justify-center bg-gray-50 border-4 border-dashed border-gray-300 rounded-xl text-gray-400">
+        QR Code akan muncul di sini
+      </div>
+    </div>
+
+    <!-- Download Button -->
+    <template x-if="url.trim() !== ''">
+      <div class="text-center">
+        <button @click="downloadQR" class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Download QR Code + Logo
+        </button>
+      </div>
+    </template>
+  </div>
+</div>
+
+<script>
+function qrGenerator() {
+  return {
+    url: '',
+    logo: null,        // akan berisi objek Image kalau ada logo
+    logoFile: null,
+
+    init() {
+      this.generateQR();
+      this.$watch('url', () => this.generateQR());
+    },
+
+    onFileChange(e) {
+      const file = e.target.files[0];
+      if (!file) {
+        this.logo = null;
+        this.generateQR();
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          this.logo = img;
+          this.generateQR();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    },
+
+    generateQR() {
+      if (!this.url.trim()) return;
+
+      // Buat QR sementara tanpa logo
+      const tempDiv = document.createElement('div');
+      new QRCode(tempDiv, {
+        text: this.url,
+        width: 512,
+        height: 512,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H   // penting agar tetap bisa discan walaupun ada logo
+      });
+
+      // Tunggu QR selesai dirender
+      setTimeout(() => {
+        const qrCanvas = tempDiv.querySelector('canvas');
+        const finalCanvas = document.getElementById('qrCanvas');
+        const ctx = finalCanvas.getContext('2d');
+
+        // Ukuran final
+        finalCanvas.width = 512;
+        finalCanvas.height = 512;
+
+        // Gambar QR dulu
+        ctx.drawImage(qrCanvas, 0, 0, 512, 512);
+
+        // Kalau ada logo, gambar di tengah
+        if (this.logo) {
+          const logoSize = 512 * 0.2; // 20% dari ukuran QR (bisa diubah)
+          const x = (512 - logoSize) / 2;
+          const y = (512 - logoSize) / 2;
+
+          // Background putih bulat (biar logo tidak "nyatu" sama QR)
+          ctx.fillStyle = "white";
+          ctx.beginPath();
+          ctx.arc(256, 256, logoSize/2 + 12, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Gambar logo
+          ctx.drawImage(this.logo, x, y, logoSize, logoSize);
+        }
+      }, 100);
+    },
+
+    downloadQR() {
+      const canvas = document.getElementById('qrCanvas');
+      const link = document.createElement('a');
+      link.download = 'qrcode-with-logo.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  }
+}
+</script>
+
+</body>
+</html>
